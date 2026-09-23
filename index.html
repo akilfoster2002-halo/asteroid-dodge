@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- =====================================================================
+     ASTEROID DODGE — a block-coding test.
+
+     Built out of the MESACS 0.2a framework: the same blocks.js (the
+     language), vm.js (what runs it), coder.js (the drag-and-drop editor)
+     and app.css the full game uses. dodge.js is the room; boot.js stands
+     in for game.js with a renderer, a keyboard and a frame loop.
+     ===================================================================== -->
+<title>Asteroid Dodge — block coding test</title>
+<meta name="description" content="Code your Avatar to move up, down, left and right, and to end the game when an Asteroid hits it. Survive as long as you can.">
+<link rel="stylesheet" href="app.css">
+<style>
+@font-face{font-family:'Space Mono';src:url('fonts/spacemono-700.woff2') format('woff2');
+  font-weight:700;font-style:normal;font-display:swap}
+@font-face{font-family:'Ubuntu Mono';src:url('fonts/ubuntumono-400.woff2') format('woff2');
+  font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:'Ubuntu Mono';src:url('fonts/ubuntumono-700.woff2') format('woff2');
+  font-weight:700;font-style:normal;font-display:swap}
+@font-face{font-family:'Ubuntu Mono';src:url('fonts/ubuntumono-400i.woff2') format('woff2');
+  font-weight:400;font-style:italic;font-display:swap}
+@font-face{font-family:'JetBrains Mono';src:url('fonts/jetbrainsmono-var.woff2') format('woff2');
+  font-weight:400 700;font-style:normal;font-display:swap}
+
+html,body{margin:0;height:100%;overflow:hidden;background:#07060f}
+#view{position:fixed;inset:0;width:100%;height:100%;display:block}
+#coder{position:fixed;inset:0;z-index:60;pointer-events:none}
+
+/* ------------------------------------------------------------- the HUD */
+#dodge{position:fixed;inset:0;z-index:56;pointer-events:none;font-family:var(--font)}
+.dg-panel{background:rgba(16,12,30,.86);border:1px solid var(--line);border-radius:12px}
+#dgTop{position:absolute;left:14px;top:14px;display:flex;gap:8px;pointer-events:auto}
+.dg-btn{background:rgba(16,12,30,.88);color:var(--star);border:1px solid var(--line);
+  border-radius:11px;padding:9px 14px;font-family:var(--font-disp);font-size:13px;
+  letter-spacing:1.4px;cursor:pointer}
+.dg-btn:hover{background:rgba(52,42,84,.95)}
+.dg-btn small{color:var(--muted);margin-left:6px;letter-spacing:1px}
+#dgRun{color:var(--good)}
+#dgRun.live{color:var(--bad)}
+#dgClock{position:absolute;left:50%;top:14px;transform:translateX(-50%);display:flex;gap:20px;
+  align-items:center;padding:9px 20px;font-family:var(--font-disp);font-size:12px;
+  letter-spacing:1.6px;color:var(--muted)}
+#dgClock b{font-size:22px;color:var(--star);letter-spacing:1px;margin-left:6px}
+#dgClock .dg-best b{font-size:15px;color:var(--accent)}
+#dgChecks{position:absolute;right:14px;bottom:14px;width:300px;padding:12px 14px;
+  font-size:13px;color:var(--muted);display:grid;gap:6px}
+.dg-h{font-family:var(--font-disp);letter-spacing:1.6px;font-size:12px;color:var(--text);
+  display:flex;justify-content:space-between;margin-bottom:2px}
+.dg-h b{color:var(--star)}
+.dg-c{display:flex;gap:9px;align-items:flex-start;line-height:1.3}
+.dg-c i{flex:none;width:16px;height:16px;border:1.5px solid var(--line);border-radius:4px;
+  font-style:normal;font-size:12px;display:grid;place-content:center;color:#13402f}
+.dg-c.ok{color:var(--text)}
+.dg-c.ok i{background:var(--good);border-color:var(--good)}
+#dgWarn{position:absolute;left:50%;top:70px;transform:translateX(-50%);padding:7px 14px;
+  background:rgba(90,20,30,.88);border:1px solid var(--bad);border-radius:10px;
+  color:#ffd6da;font-size:13px}
+#dgOver{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);pointer-events:auto;
+  display:grid;gap:10px;justify-items:center;text-align:center;padding:24px 34px;min-width:280px;
+  background:rgba(16,12,30,.94);border:1px solid var(--star);border-radius:16px;color:var(--muted)}
+#dgOver b{font-family:var(--font-disp);font-size:24px;letter-spacing:3px;color:var(--text)}
+#dgOver em{font-style:normal;font-size:22px;color:var(--star);font-family:var(--font-disp)}
+#dgOver .dg-sub{font-size:12px;letter-spacing:1px}
+#dodge.coding #dgTop,#dodge.coding #dgChecks,#dodge.coding #dgTeacher{display:none}
+#dodge.coding #dgClock{top:72px}
+#dodge.coding #dgWarn{top:128px}
+#dgTeacher{position:absolute;left:14px;bottom:14px;padding:6px 12px;font-size:12px;
+  color:var(--warn);border-color:var(--warn)}
+
+/* the brief — the test question, shown first and behind the ? button */
+#dgBrief{position:fixed;inset:0;z-index:80;display:grid;place-items:center;
+  background:rgba(7,6,15,.78);padding:16px}
+#dgBrief .card{max-width:620px;width:100%;max-height:92vh;overflow:auto;padding:26px 30px;
+  background:var(--ink);border:1px solid var(--line);border-radius:18px;color:var(--text);text-align:left}
+#dgBrief h1{font-family:var(--font-disp);letter-spacing:3px;font-size:24px;margin:0 0 4px}
+#dgBrief .kick{color:var(--star);font-size:12px;letter-spacing:2px;margin:0 0 16px}
+#dgBrief p{color:var(--muted);line-height:1.5;margin:8px 0}
+#dgBrief ol{margin:10px 0 16px;padding-left:22px;line-height:1.55}
+#dgBrief li{margin:6px 0}
+#dgBrief code{font-family:var(--font-code);font-size:12.5px;background:var(--panel2);
+  padding:1px 6px;border-radius:6px;color:var(--star)}
+#dgBrief .row{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+
+.dg-sorry{position:fixed;inset:0;display:grid;place-content:center;gap:10px;text-align:center;
+  font-family:var(--font,system-ui);color:var(--text,#e9e4ff);background:#07060f;padding:24px;z-index:99}
+.dg-sorry b{font-family:var(--font-disp,inherit);font-size:20px;letter-spacing:2px}
+.dg-sorry small{color:var(--muted,#9a91b8);font-size:13px;max-width:34ch}
+
+@media (max-width:760px){
+  #dgChecks{width:auto;left:14px;font-size:12px}
+  #dgClock{top:60px}
+}
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+
+<div id="dodge">
+  <div id="dgTop">
+    <button class="dg-btn" id="dgOpen">▦ BLOCKS <small>C</small></button>
+    <button class="dg-btn" id="dgRun">▶ RUN</button>
+    <button class="dg-btn" id="dgHelp" title="Show the test again">?</button>
+    <button class="dg-btn" id="dgReset" title="Throw away your Avatar code">↺</button>
+  </div>
+  <div id="dgClock" class="dg-panel"></div>
+  <div id="dgWarn" class="hidden">💥 An Asteroid is hitting you — but your program didn't stop.</div>
+  <div id="dgChecks" class="dg-panel"></div>
+  <div id="dgOver" class="hidden"></div>
+  <div id="dgTeacher" class="dg-panel hidden">Teacher view — answer key loaded (not saved)</div>
+</div>
+
+<div id="dgBrief">
+  <div class="card">
+    <h1>ASTEROID DODGE</h1>
+    <p class="kick">BLOCK CODING TEST</p>
+    <p>Asteroids fly across space from the right. They are already coded — click one to read how.
+       Your <b>Avatar</b> (the blue one) has <b>no code yet</b>. Write it in blocks.</p>
+    <ol>
+      <li><b>Movement.</b> Make the Avatar move <b>up</b>, <b>down</b>, <b>left</b> and <b>right</b>
+          when you press keys. <i>Hint:</i> <code>if &lt;key [up] pressed?&gt; then</code> +
+          <code>change y by 0.3</code> — and think about what has to go around them so they
+          are checked more than once.</li>
+      <li><b>Game over.</b> <code>if &lt;touching [Asteroid]?&gt; then</code> …
+          <code>stop [all]</code>. Without it, rocks pass straight through you and the game
+          never ends.</li>
+      <li>Press <b>▶ RUN</b> and stay alive as long as you can. Your time is your score.</li>
+    </ol>
+    <p>The checklist in the corner ticks each part off when it sees <i>your program</i> do it.
+       Your code is saved in this browser. <code>x</code> is left/right, <code>y</code> is up/down.</p>
+    <div class="row">
+      <button class="btn good" id="dgGo">Start coding</button>
+    </div>
+  </div>
+</div>
+
+<div id="coder" class="hidden">
+  <div id="cBar"></div>
+  <div id="cObj"></div>
+  <div id="cCoach" class="hidden"></div>
+  <div id="tutor" class="hidden"></div>
+  <div id="cPal"></div>
+  <div id="cScript"></div>
+</div>
+
+<script src="lib/three.classic.js"></script>
+<script src="strings.js"></script>
+<script src="blocks.js"></script>
+<script src="vm.js"></script>
+<script src="coder.js"></script>
+<script src="dodge.js"></script>
+<script src="boot.js"></script>
+</body>
+</html>
