@@ -304,7 +304,7 @@ window.VM = (function(){
       case 'sense.dist': { const o=target(g('o'),ctx); if(!o||!ctx.actor) return 0;
         return +Math.hypot(o.x-ctx.actor.x,o.y-ctx.actor.y,o.z-ctx.actor.z).toFixed(2); }
       case 'sense.touch': {
-        if(g('o')==='edge') return atEdge(ctx.actor);
+        if(EDGES.includes(g('o'))) return atEdge(ctx.actor, g('o'));
         /* TOUCHING A NAME MEANS TOUCHING ANY OF THEM, clones included, the
            way Scratch reads it — `touching Asteroid?` has to see every rock
            the spawner made, not only the hidden one they were copied from.
@@ -372,11 +372,23 @@ window.VM = (function(){
   /* The room's four walls. An object touches the edge once its own skin
      reaches one — and it STAYS touching if it has already gone past, so a
      fast mover cannot step over the test in one go and escape the room. */
-  function atEdge(a){
+  /* ONE WALL AT A TIME, too: `up edge` is the wall at the top of the
+     screen, and so on round. Named in the language's axes — up is +y,
+     which is the engine's −z — so they mean what they say from the flat
+     stage camera. Plain `edge` is still any of the four. */
+  const EDGES = ['edge','up edge','down edge','left edge','right edge'];
+  function atEdge(a, side){
     if(!a) return false;
     const L=(window.LEVELS||{})[G.room] || { w:70, d:70 };
     const r=(a.size||1)*0.5;                    // walls are 1 thick, centred on w/2
-    return Math.abs(a.x) >= L.w/2-0.5-r || Math.abs(a.z) >= L.d/2-0.5-r;
+    const X=L.w/2-0.5-r, Y=L.d/2-0.5-r, y=-a.z;
+    switch(side){
+      case 'up edge':    return y   >=  Y;
+      case 'down edge':  return y   <= -Y;
+      case 'left edge':  return a.x <= -X;
+      case 'right edge': return a.x >=  X;
+    }
+    return Math.abs(a.x) >= X || Math.abs(a.z) >= Y;
   }
   /* `player` is the person standing in the world; anything else is an object */
   function target(nameOrObj,ctx){

@@ -138,11 +138,12 @@ window.DODGE = (function(){
   /* ================================================ the given scripts */
   const B=(op,args,body)=>{ const b={ op, args:args||{} }; if(body) b.body=body; return b; };
   const IF=(cond,body)=>B('ctrl.if',{ c:cond }, body);
-  /* one arrow key, fenced: move, and if that put you on the edge, move
-     straight back. The `touching edge?` half is part 3 of the test. */
+  /* one arrow key, fenced: move, and if that put you on THAT side's edge,
+     move straight back. Up is fenced by the up edge, left by the left edge
+     and so on round — the `touching [..] edge?` half is part 2 of the test. */
   const key=(k,a,n)=>IF(B('sense.key',{ k }), [
     B('motion.changeBy',{ a, n }),
-    IF(B('sense.touch',{ o:'edge' }), [ B('motion.changeBy',{ a, n:-n }) ])
+    IF(B('sense.touch',{ o:k+' edge' }), [ B('motion.changeBy',{ a, n:-n }) ])
   ]);
 
   /* THE ASTEROIDS, finished. Harder the longer you last: every rock adds
@@ -227,6 +228,7 @@ window.DODGE = (function(){
     keep();
     if(window.CODER) CODER.render();
     check.up=check.down=check.left=check.right=check.edge=check.hit=false;
+    SIDES.forEach(d=>{ side[d]=false; });
     paintChecks();
   }
 
@@ -246,24 +248,29 @@ window.DODGE = (function(){
      one, so w = 2·16 + 1 puts them exactly on the drawn border. */
   window.LEVELS = Object.assign(window.LEVELS||{}, {
     dodge:{ w:ARENA.x*2+1, d:ARENA.y*2+1 } });
-  /* the program has to actually contain the block — a fence built out of
-     `x position > 16` is a fence, but it is not this question */
-  const usesEdge = ()=>{
+  /* FOUR WALLS, FOUR BLOCKS. Each side is judged on its own: the program
+     has to contain `touching [up edge]?` for the top to count, and so on.
+     A fence built out of `y position > 9` is a fence, but it is not this
+     question. */
+  const SIDES=['up','down','left','right'];
+  const usesEdge = d=>{
     const walk=v=>{
       if(!v || typeof v!=='object') return false;
       if(Array.isArray(v)) return v.some(walk);
-      if(v.op==='sense.touch' && v.args && v.args.o==='edge') return true;
+      if(v.op==='sense.touch' && v.args && v.args.o===d+' edge') return true;
       return Object.keys(v).some(k=>walk(v[k]));
     };
     const me=actor(ME); return !!(me && walk(me.scripts));
   };
   /* outside means the Avatar's middle is past the drawn line */
   const outside = p => Math.abs(p.x)>ARENA.x || Math.abs(p.y)>ARENA.y;
-  /* near means pressed up against it: within a step or so of where
-     `touching edge?` starts saying yes */
-  const nearEdge = (p,me)=>{ const r=(me.size||1)*0.5+1;
-    return Math.abs(p.x)>=ARENA.x-r || Math.abs(p.y)>=ARENA.y-r; };
-  let edgeTime=0, escaped=false;
+  /* against means pressed up against that one wall: within a step or so
+     of where `touching [..] edge?` starts saying yes */
+  const against = (p,me,d)=>{ const r=(me.size||1)*0.5+1;
+    return d==='up'   ? p.y>= ARENA.y-r : d==='down'  ? p.y<=-(ARENA.y-r)
+         : d==='left' ? p.x<=-(ARENA.x-r) : p.x>= ARENA.x-r; };
+  const side={ up:false, down:false, left:false, right:false };   // walls passed
+  let edgeTime={}, escaped=false;
   let was=null, wasRunning=false, runStart=0, survived=0, lastRun=-1;
   let best=0; try{ best=parseFloat(localStorage.getItem(BEST_KEY))||0; }catch(e){}
   let over=null;          // how the last run ended: 'hit' | 'stopped' | null
@@ -276,7 +283,7 @@ window.DODGE = (function(){
 
     if(running && VM.runId!==lastRun){           // a fresh press of Run
       lastRun=VM.runId; runStart=performance.now(); over=null; hideOver();
-      edgeTime=0; escaped=false;
+      edgeTime={}; escaped=false;
       /* a `say` from the run that ended by `stop all` is still up — a
          restart does not clear bubbles, so the room says nothing for it */
       VM.project.actors.forEach(x=>{ if(x.saying) VM.runBlock({ op:'looks.say', args:{ s:'' } }, x); });
@@ -288,14 +295,19 @@ window.DODGE = (function(){
         if(dy> e) check.up=true;    if(dy<-e) check.down=true;
         if(dx<-e) check.left=true;  if(dx> e) check.right=true;
       }
-      /* STAYS INSIDE: half a second pushed up against the border, with a
-         key held, without once getting past it this run — and with a
-         `touching edge?` in the program doing the stopping. Without a
-         fence the Avatar crosses the edge zone in a few frames and is
-         gone, so the half-second cannot be earned by accident. */
+      /* STAYS INSIDE, one wall at a time: half a second pushed up against
+         that wall, with a key held, without once getting past any wall
+         this run — and with that wall's own `touching [..] edge?` in the
+         program doing the stopping. Without a fence the Avatar crosses
+         the edge zone in a few frames and is gone, so the half-second
+         cannot be earned by accident. All four walls = the tick. */
       if(outside(now)) escaped=true;
-      if(!escaped && anyKey() && nearEdge(now,me)) edgeTime+=dt;
-      if(!escaped && edgeTime>=0.5 && usesEdge()) check.edge=true;
+      if(!escaped && anyKey()) SIDES.forEach(d=>{
+        if(!against(now,me,d)) return;
+        edgeTime[d]=(edgeTime[d]||0)+dt;
+        if(edgeTime[d]>=0.5 && usesEdge(d)) side[d]=true;
+      });
+      check.edge = SIDES.every(d=>side[d]);
     }
     if(wasRunning && !running){                  // the program just stopped
       over = hitting() ? 'hit' : 'stopped';
@@ -443,14 +455,17 @@ window.DODGE = (function(){
     ['down',  'Avatar moves DOWN when you press a key'],
     ['left',  'Avatar moves LEFT when you press a key'],
     ['right', 'Avatar moves RIGHT when you press a key'],
-    ['edge',  'Avatar can\'t leave the arena (touching edge?)'],
+    ['edge',  'Avatar can\'t leave the arena — touching up / down / left / right edge?'],
     ['hit',   'Game ENDS (stop all) when an Asteroid hits you']
   ];
   function paintChecks(){
     const el=$('#dgChecks'); if(!el) return;
     const done=ITEMS.filter(i=>check[i[0]]).length;
     el.innerHTML=`<div class="dg-h">${T('YOUR TEST')} <b>${done}/${ITEMS.length}</b></div>`+
-      ITEMS.map(([k,s])=>`<div class="dg-c ${check[k]?'ok':''}"><i>${check[k]?'✓':''}</i>${T(s)}</div>`).join('');
+      ITEMS.map(([k,s])=>`<div class="dg-c ${check[k]?'ok':''}"><i>${check[k]?'✓':''}</i><span>${T(s)}${
+        k==='edge' ? `<span class="dg-sides">${SIDES.map(d=>
+          `<em class="${side[d]?'ok':''}">${({up:'↑ up',down:'↓ down',left:'← left',right:'→ right'})[d]}</em>`).join('')}</span>` : ''
+      }</span></div>`).join('');
   }
   function clock(){
     const el=$('#dgClock'); if(!el) return;

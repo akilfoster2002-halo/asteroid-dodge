@@ -304,7 +304,7 @@ window.BLOCKS = (function(){
     'looks.shape':"Changes the object's costume — a shape, or anybody out of the kits. Mid-program, so a car can become a person.",
 
     'sense.dist':"Reports how far away something is. Compare it with a number to react when it gets close.",
-    'sense.touch':"True while the object is touching that thing. Pick 'edge' for the walls of the room — that is how you keep something from wandering out.",
+    'sense.touch':"True while the object is touching that thing. Pick 'up edge', 'down edge', 'left edge' or 'right edge' for one wall of the room — that is how you keep something from wandering out.",
     'sense.key':"True while that key is held down. Use it inside 'forever' for smooth controls.",
     'sense.posOf':"Reports one coordinate of another object — how you make one thing follow another.",
     'sense.timer':"Counts seconds since the project started or the timer was reset.",
