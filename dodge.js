@@ -138,7 +138,12 @@ window.DODGE = (function(){
   /* ================================================ the given scripts */
   const B=(op,args,body)=>{ const b={ op, args:args||{} }; if(body) b.body=body; return b; };
   const IF=(cond,body)=>B('ctrl.if',{ c:cond }, body);
-  const key=(k,a,n)=>IF(B('sense.key',{ k }), [ B('motion.changeBy',{ a, n }) ]);
+  /* one arrow key, fenced: move, and if that put you on the edge, move
+     straight back. The `touching edge?` half is part 3 of the test. */
+  const key=(k,a,n)=>IF(B('sense.key',{ k }), [
+    B('motion.changeBy',{ a, n }),
+    IF(B('sense.touch',{ o:'edge' }), [ B('motion.changeBy',{ a, n:-n }) ])
+  ]);
 
   /* THE ASTEROIDS, finished. Harder the longer you last: every rock adds
      timer ÷ 300 to its speed, so a minute in they are roughly twice as fast. */
@@ -221,7 +226,7 @@ window.DODGE = (function(){
     a.scripts=starter();
     keep();
     if(window.CODER) CODER.render();
-    check.up=check.down=check.left=check.right=check.hit=false;
+    check.up=check.down=check.left=check.right=check.edge=check.hit=false;
     paintChecks();
   }
 
@@ -234,19 +239,44 @@ window.DODGE = (function(){
     return VM.project.actors.some(o=>o.name===ROCK && o.visible!==false &&
       Math.hypot(o.x-me.x, o.z-me.z) < (me.size+o.size)*0.6);
   };
-  const check={ up:false, down:false, left:false, right:false, hit:false };
+  const check={ up:false, down:false, left:false, right:false, edge:false, hit:false };
+
+  /* THE EDGE, measured the way `touching edge?` measures it. vm.js puts
+     the walls at ±(w/2 − 0.5) and a thing touches once its skin reaches
+     one, so w = 2·16 + 1 puts them exactly on the drawn border. */
+  window.LEVELS = Object.assign(window.LEVELS||{}, {
+    dodge:{ w:ARENA.x*2+1, d:ARENA.y*2+1 } });
+  /* the program has to actually contain the block — a fence built out of
+     `x position > 16` is a fence, but it is not this question */
+  const usesEdge = ()=>{
+    const walk=v=>{
+      if(!v || typeof v!=='object') return false;
+      if(Array.isArray(v)) return v.some(walk);
+      if(v.op==='sense.touch' && v.args && v.args.o==='edge') return true;
+      return Object.keys(v).some(k=>walk(v[k]));
+    };
+    const me=actor(ME); return !!(me && walk(me.scripts));
+  };
+  /* outside means the Avatar's middle is past the drawn line */
+  const outside = p => Math.abs(p.x)>ARENA.x || Math.abs(p.y)>ARENA.y;
+  /* near means pressed up against it: within a step or so of where
+     `touching edge?` starts saying yes */
+  const nearEdge = (p,me)=>{ const r=(me.size||1)*0.5+1;
+    return Math.abs(p.x)>=ARENA.x-r || Math.abs(p.y)>=ARENA.y-r; };
+  let edgeTime=0, escaped=false;
   let was=null, wasRunning=false, runStart=0, survived=0, lastRun=-1;
   let best=0; try{ best=parseFloat(localStorage.getItem(BEST_KEY))||0; }catch(e){}
   let over=null;          // how the last run ended: 'hit' | 'stopped' | null
 
   function anyKey(){ return Object.keys(G.keys).some(k=>G.keys[k]); }
-  function watch(){
+  function watch(dt){
     const me=actor(ME); if(!me) return;
     const now={ x:rd(me,'x'), y:rd(me,'y') };
     const running=VM.running;
 
     if(running && VM.runId!==lastRun){           // a fresh press of Run
       lastRun=VM.runId; runStart=performance.now(); over=null; hideOver();
+      edgeTime=0; escaped=false;
       /* a `say` from the run that ended by `stop all` is still up — a
          restart does not clear bubbles, so the room says nothing for it */
       VM.project.actors.forEach(x=>{ if(x.saying) VM.runBlock({ op:'looks.say', args:{ s:'' } }, x); });
@@ -258,6 +288,14 @@ window.DODGE = (function(){
         if(dy> e) check.up=true;    if(dy<-e) check.down=true;
         if(dx<-e) check.left=true;  if(dx> e) check.right=true;
       }
+      /* STAYS INSIDE: half a second pushed up against the border, with a
+         key held, without once getting past it this run — and with a
+         `touching edge?` in the program doing the stopping. Without a
+         fence the Avatar crosses the edge zone in a few frames and is
+         gone, so the half-second cannot be earned by accident. */
+      if(outside(now)) escaped=true;
+      if(!escaped && anyKey() && nearEdge(now,me)) edgeTime+=dt;
+      if(!escaped && edgeTime>=0.5 && usesEdge()) check.edge=true;
     }
     if(wasRunning && !running){                  // the program just stopped
       over = hitting() ? 'hit' : 'stopped';
@@ -277,6 +315,126 @@ window.DODGE = (function(){
     if(me.mesh && me.mesh.material && me.mesh.material.color)
       me.mesh.material.color.set(red ? '#ff5a5a' : me.colour);
     const warn=$('#dgWarn'); if(warn) warn.classList.toggle('hidden', !red);
+    const out=$('#dgOut'); if(out) out.classList.toggle('hidden', !(running && outside(now)));
+  }
+
+  /* ============================================= the script, as a PDF
+     WHAT A STUDENT HANDS IN: their Avatar's blocks written out as text,
+     one block to a line and indented the way they nest, under their name,
+     the date, their best time and the checklist as it stands.
+
+     THE PDF IS WRITTEN HERE, by hand. The whole folder runs with no
+     network and no install, and a PDF library off a CDN would break that
+     on the first lab machine without internet. Text in Courier is the
+     simplest PDF there is: a few objects, a content stream per page, and
+     a table of byte offsets at the end. */
+  const ASCII = str => String(str==null?'':str)
+    .replace(/▶ */g,'').replace(/[−–—]/g,'-').replace(/×/g,'*').replace(/÷/g,'/')
+    .replace(/[‘’]/g,"'").replace(/[“”]/g,'"').replace(/…/g,'...')
+    .replace(/[^\x20-\x7e]/g,'?');
+  function inline(bk){
+    const bd=window.BLOCKS && BLOCKS.of(bk.op); if(!bd) return bk.op;
+    return BLOCKS.parts(bd.label).map(seg=>{
+      if(seg[0]!=='%') return seg;
+      const k=seg[1], sp=bd.args[k]||{}, v=(bk.args||{})[k];
+      if(v && typeof v==='object' && v.op){
+        const kd=(BLOCKS.of(v.op)||{}).kind;
+        return kd==='bool' ? '<'+inline(v)+'>' : '('+inline(v)+')';
+      }
+      if(sp.type==='bool') return '< >';
+      if(sp.type==='num' || sp.type==='str') return '('+(v==null?'':v)+')';
+      return '['+(v==null?'':v)+']';
+    }).join('');
+  }
+  function lines(list, depth, out){
+    const pad='    '.repeat(depth);
+    (list||[]).forEach(bk=>{
+      out.push(pad+inline(bk));
+      const kd=(BLOCKS.of(bk.op)||{}).kind;
+      if(kd==='c' || kd==='c2'){
+        lines(bk.body, depth+1, out);
+        if(kd==='c2'){ out.push(pad+'else'); lines(bk.body2, depth+1, out); }
+        out.push(pad+'end');
+      }
+    });
+    return out;
+  }
+  function scriptText(){
+    const me=actor(ME), out=[];
+    (me && me.scripts || []).forEach((sc,i)=>{
+      if(i) out.push('');
+      if(sc.hat){ out.push(inline(sc.hat)); lines(sc.body, 1, out); }
+      else lines(sc.body, 0, out);
+    });
+    return out.length ? out : ['(no blocks yet)'];
+  }
+  /* a hundred lines of PDF: pages of Courier, a bold line where asked */
+  function pdf(rows){
+    const W=612, H=792, M=54, LH=13, COLS=84, PER=Math.floor((H-2*M)/LH);
+    const wrapped=[];
+    rows.forEach(r=>{
+      let t=ASCII(r.t), lead=(t.match(/^ */)||[''])[0]+'      ';
+      if(!t.length){ wrapped.push({ t:'', b:r.b }); return; }
+      while(t.length>COLS){ wrapped.push({ t:t.slice(0,COLS), b:r.b }); t=lead+t.slice(COLS); }
+      wrapped.push({ t, b:r.b });
+    });
+    const pages=[];
+    for(let i=0;i<wrapped.length;i+=PER) pages.push(wrapped.slice(i,i+PER));
+    const esc=t=>t.replace(/\\/g,'\\\\').replace(/\(/g,'\\(').replace(/\)/g,'\\)');
+    const objs=[];                                   // index 0 is object 1
+    objs[0]='<< /Type /Catalog /Pages 2 0 R >>';
+    objs[2]='<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>';
+    objs[3]='<< /Type /Font /Subtype /Type1 /BaseFont /Courier-Bold >>';
+    const kids=[];
+    pages.forEach((pg,n)=>{
+      const pageNo=6+n*2, streamNo=pageNo+1;   // 1-4 fonts and tree, 5 is Info
+      let body='BT\n'+LH+' TL\n'+M+' '+(H-M)+' Td\n';
+      pg.forEach(r=>{ body+=(r.b?'/F2':'/F1')+' 10 Tf\n('+esc(r.t)+') Tj T*\n'; });
+      body+='/F1 8 Tf\nET\nBT /F1 8 Tf '+(W-M-60)+' '+(M/2)+' Td (page '+(n+1)+' of '+pages.length+') Tj ET\n';
+      objs[pageNo-1]='<< /Type /Page /Parent 2 0 R /MediaBox [0 0 '+W+' '+H+'] '+
+        '/Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents '+streamNo+' 0 R >>';
+      objs[streamNo-1]='<< /Length '+body.length+' >>\nstream\n'+body+'endstream';
+      kids.push(pageNo+' 0 R');
+    });
+    objs[1]='<< /Type /Pages /Kids ['+kids.join(' ')+'] /Count '+pages.length+' >>';
+    objs[4]='<< /Producer (Asteroid Dodge) >>';
+    let out='%PDF-1.4\n'; const at=[];
+    objs.forEach((o,i)=>{ at[i]=out.length; out+=(i+1)+' 0 obj\n'+o+'\nendobj\n'; });
+    const xref=out.length;
+    out+='xref\n0 '+(objs.length+1)+'\n0000000000 65535 f \n'+
+      at.map(o=>String(o).padStart(10,'0')+' 00000 n \n').join('')+
+      'trailer\n<< /Size '+(objs.length+1)+' /Root 1 0 R /Info 5 0 R >>\nstartxref\n'+xref+'\n%%EOF\n';
+    return out;
+  }
+  const NAME_KEY='asteroid-dodge.name';
+  function download(){
+    let name=''; try{ name=localStorage.getItem(NAME_KEY)||''; }catch(e){}
+    const typed=prompt(T('Your name, for the top of the page:'), name);
+    if(typed===null) return;                   // cancelled
+    name=typed.trim();
+    try{ localStorage.setItem(NAME_KEY, name); }catch(e){}
+    const done=ITEMS.filter(i=>check[i[0]]).length;
+    const rows=[
+      { t:'ASTEROID DODGE - Block Coding Test', b:true },
+      { t:'' },
+      { t:'Student:     '+(name||'(no name)') },
+      { t:'Date:        '+new Date().toLocaleString() },
+      { t:'Best time:   '+best.toFixed(1)+' s' },
+      { t:'' },
+      { t:'CHECKLIST  '+done+'/'+ITEMS.length, b:true },
+      ...ITEMS.map(([k,txt])=>({ t:(check[k]?'[x] ':'[ ] ')+txt })),
+      { t:'' },
+      { t:'AVATAR SCRIPT', b:true },
+      { t:'' },
+      ...scriptText().map(t=>({ t }))
+    ];
+    const blob=new Blob([pdf(rows)], { type:'application/pdf' });
+    const a=document.createElement('a');
+    const slug=(name||'student').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'student';
+    a.href=URL.createObjectURL(blob);
+    a.download='asteroid-dodge-'+slug+'.pdf';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
   }
 
   /* ==================================================== the screen */
@@ -285,6 +443,7 @@ window.DODGE = (function(){
     ['down',  'Avatar moves DOWN when you press a key'],
     ['left',  'Avatar moves LEFT when you press a key'],
     ['right', 'Avatar moves RIGHT when you press a key'],
+    ['edge',  'Avatar can\'t leave the arena (touching edge?)'],
     ['hit',   'Game ENDS (stop all) when an Asteroid hits you']
   ];
   function paintChecks(){
@@ -349,6 +508,7 @@ window.DODGE = (function(){
   let on=false;
   function start(){
     on=true;
+    G.room='dodge';
     build();
     G.hits=[];            // the VM fills this with every object's aim box
     VM.useScratch();
@@ -367,6 +527,7 @@ window.DODGE = (function(){
     $('#dgOpen').onclick=()=>{ if(window.CODER) CODER.toggle(); };
     $('#dgRun').onclick=()=>{ if(VM.running) VM.stopAll(); else VM.greenFlag(); };
     $('#dgReset').onclick=resetMine;
+    $('#dgPdf').onclick=download;
     $('#dgGo').onclick=()=>{
       $('#dgBrief').classList.add('hidden');
       if(window.CODER){ CODER.setActor(actor(ME)); CODER.show(); }
@@ -382,7 +543,7 @@ window.DODGE = (function(){
     VM.step(dt);
     /* everything lives at one height, so `touching` is a 2D question */
     VM.project.actors.forEach(a=>{ if(a.y!==1){ a.y=1; VM.sync(a); } });
-    watch();
+    watch(dt);
     camera();
     if(starfield) starfield.position.x = ((starfield.position.x - dt*0.6 + 35) % 70) - 35;
     if(window.CODER) CODER.tick(dt);
@@ -391,7 +552,7 @@ window.DODGE = (function(){
     if((keepT+=dt)>1){ keepT=0; keep(); }
   }
 
-  return { start, tick, ME, ROCK, ARENA, answer, starter, check,
+  return { start, tick, ME, ROCK, ARENA, answer, starter, check, scriptText, pdf, download,
            get active(){ return on; },
            get survived(){ return survived; },
            get over(){ return over; } };

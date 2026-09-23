@@ -59,6 +59,10 @@ html,body{margin:0;height:100%;overflow:hidden;background:#07060f}
 #dgWarn{position:absolute;left:50%;top:70px;transform:translateX(-50%);padding:7px 14px;
   background:rgba(90,20,30,.88);border:1px solid var(--bad);border-radius:10px;
   color:#ffd6da;font-size:13px}
+#dgOut{position:absolute;left:50%;top:112px;transform:translateX(-50%);padding:7px 14px;
+  background:rgba(80,60,10,.9);border:1px solid var(--warn);border-radius:10px;
+  color:#fff0d6;font-size:13px}
+#dodge.coding #dgOut{top:170px}
 #dgOver{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);pointer-events:auto;
   display:grid;gap:10px;justify-items:center;text-align:center;padding:24px 34px;min-width:280px;
   background:rgba(16,12,30,.94);border:1px solid var(--star);border-radius:16px;color:var(--muted)}
@@ -90,9 +94,13 @@ html,body{margin:0;height:100%;overflow:hidden;background:#07060f}
 .dg-sorry b{font-family:var(--font-disp,inherit);font-size:20px;letter-spacing:2px}
 .dg-sorry small{color:var(--muted,#9a91b8);font-size:13px;max-width:34ch}
 
+@media (max-width:1180px){
+  #dgClock{top:62px}
+  #dgWarn{top:116px}
+  #dgOut{top:158px}
+}
 @media (max-width:760px){
   #dgChecks{width:auto;left:14px;font-size:12px}
-  #dgClock{top:60px}
 }
 </style>
 </head>
@@ -103,11 +111,13 @@ html,body{margin:0;height:100%;overflow:hidden;background:#07060f}
   <div id="dgTop">
     <button class="dg-btn" id="dgOpen">▦ BLOCKS <small>C</small></button>
     <button class="dg-btn" id="dgRun">▶ RUN</button>
+    <button class="dg-btn" id="dgPdf" title="Download your Avatar script as a PDF">⤓ PDF</button>
     <button class="dg-btn" id="dgHelp" title="Show the test again">?</button>
     <button class="dg-btn" id="dgReset" title="Throw away your Avatar code">↺</button>
   </div>
   <div id="dgClock" class="dg-panel"></div>
   <div id="dgWarn" class="hidden">💥 An Asteroid is hitting you — but your program didn't stop.</div>
+  <div id="dgOut" class="hidden">🚧 Your Avatar left the arena — use <b>touching edge?</b> to stop it.</div>
   <div id="dgChecks" class="dg-panel"></div>
   <div id="dgOver" class="hidden"></div>
   <div id="dgTeacher" class="dg-panel hidden">Teacher view — answer key loaded (not saved)</div>
@@ -124,13 +134,17 @@ html,body{margin:0;height:100%;overflow:hidden;background:#07060f}
           when you press keys. <i>Hint:</i> <code>if &lt;key [up] pressed?&gt; then</code> +
           <code>change y by 0.3</code> — and think about what has to go around them so they
           are checked more than once.</li>
+      <li><b>Stay inside.</b> The Avatar must not leave the arena. Use
+          <code>&lt;touching [edge]?&gt;</code>: right after each move, if the Avatar is
+          touching the edge, move it straight back the same amount the other way.</li>
       <li><b>Game over.</b> <code>if &lt;touching [Asteroid]?&gt; then</code> …
           <code>stop [all]</code>. Without it, rocks pass straight through you and the game
           never ends.</li>
       <li>Press <b>▶ RUN</b> and stay alive as long as you can. Your time is your score.</li>
     </ol>
     <p>The checklist in the corner ticks each part off when it sees <i>your program</i> do it.
-       Your code is saved in this browser. <code>x</code> is left/right, <code>y</code> is up/down.</p>
+       Your code is saved in this browser; press <b>⤓ PDF</b> to download your script to hand in.
+       <code>x</code> is left/right, <code>y</code> is up/down.</p>
     <div class="row">
       <button class="btn good" id="dgGo">Start coding</button>
     </div>
