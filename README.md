@@ -48,6 +48,13 @@ The **⤓ PDF** button asks for the student's name. It then downloads
 The PDF is written by `dodge.js` itself, with no library, so it works offline like the
 rest of the folder.
 
+## Play it online
+
+**https://asteroid-dodge-nu.vercel.app**. The teacher answer key is at
+https://asteroid-dodge-nu.vercel.app/?answer.
+
+It's hosted on Vercel as a static site, with no build step.
+
 ## Running it
 
 It is a plain static folder, with no build step and no install:
