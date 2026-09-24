@@ -113,10 +113,78 @@ window.DODGE = (function(){
     };
     edge(0,-ARENA.y, ARENA.x*2, 0.08); edge(0, ARENA.y, ARENA.x*2, 0.08);
     edge(-ARENA.x,0, 0.08, ARENA.y*2); edge( ARENA.x,0, 0.08, ARENA.y*2);
+    coordinates(world);
 
     world.add(new THREE.AmbientLight(0xffffff, 0.75));
     const key=new THREE.DirectionalLight(0xffffff, 0.8);
     key.position.set(-10, 40, 12); world.add(key);
+  }
+
+  /* ================================================ the coordinates
+     THE NUMBERS ARE ON THE MAP. A faint grid every 2 units with the two
+     axes a little brighter, x values along the bottom, y values down the
+     left, and the four edge values in yellow — so a student reading
+     `touching [right edge]?` can look across and see that the right edge
+     is x = 16. Everything here is drawn in the language's axes (y up the
+     screen) and turned into the engine's (z down it) at the last moment. */
+  const GRID_STEP=2, X_TICK=4, Y_TICK=3;
+  function coordinates(world){
+    /* the grid lines, below the objects and above the stars */
+    const pts=[], col=[], c=new THREE.Color();
+    const line=(x1,y1,x2,y2,hex)=>{ c.setHex(hex);
+      pts.push(x1,-0.05,-y1, x2,-0.05,-y2); col.push(c.r,c.g,c.b, c.r,c.g,c.b); };
+    for(let x=-ARENA.x+GRID_STEP; x<ARENA.x; x+=GRID_STEP)
+      line(x,-ARENA.y, x,ARENA.y, x===0 ? 0x4c4380 : 0x201b38);
+    for(let y=-ARENA.y+1; y<ARENA.y; y+=1){
+      if(y%GRID_STEP && y!==0) continue;
+      line(-ARENA.x,y, ARENA.x,y, y===0 ? 0x4c4380 : 0x201b38);
+    }
+    const g=new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pts,3));
+    g.setAttribute('color',    new THREE.Float32BufferAttribute(col,3));
+    world.add(new THREE.LineSegments(g, new THREE.LineBasicMaterial({ vertexColors:true })));
+
+    /* the numbers: little flat signs lying on the floor, facing the camera */
+    const label=(text, x, y, colour, align, size)=>{
+      const cv=document.createElement('canvas'), H=64;
+      const ctx=cv.getContext('2d');
+      const font=`700 44px ${window.uiFont ? uiFont() : 'monospace'}`;
+      ctx.font=font;
+      cv.width=Math.ceil(ctx.measureText(text).width)+16; cv.height=H;
+      ctx.font=font; ctx.fillStyle=colour; ctx.textBaseline='middle';
+      ctx.textAlign='center'; ctx.fillText(text, cv.width/2, H/2+2);
+      const tex=new THREE.CanvasTexture(cv);
+      const h=size||0.75, w=h*cv.width/H;
+      const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),
+        new THREE.MeshBasicMaterial({ map:tex, transparent:true, depthWrite:false }));
+      m.rotation.x=-Math.PI/2;                         // lie flat, readable from above
+      const dx = align==='right' ? -w/2 : align==='left' ? w/2 : 0;
+      m.position.set(x+dx, 0.05, -y);
+      world.add(m);
+    };
+    const DIM='#8f84b8', EDGE='#ffe9a8';
+    const minus = v => v<0 ? '−'+(-v) : String(v);     // a real minus sign
+    /* x along the bottom */
+    for(let x=-ARENA.x; x<=ARENA.x; x+=X_TICK){
+      const atEdge=Math.abs(x)===ARENA.x;
+      label(atEdge ? 'x = '+minus(x) : minus(x), x, -ARENA.y-0.7, atEdge?EDGE:DIM);
+    }
+    /* y down the left */
+    for(let y=-ARENA.y; y<=ARENA.y; y+=Y_TICK){
+      const atEdge=Math.abs(y)===ARENA.y;
+      label(atEdge ? 'y = '+minus(y) : minus(y), -ARENA.x-0.35, y, atEdge?EDGE:DIM, 'right');
+    }
+    /* EACH EDGE NAMED WHERE IT IS: at the middle of the line, just inside,
+       with the block's own word for it. The corners are where the HUD
+       sits, so the midpoints are the places that are always in view. */
+    const EDGE_FAINT='rgba(255,233,168,.75)';
+    label('y = 9 · up edge',        0,  ARENA.y-0.6, EDGE_FAINT, null, 0.7);
+    label('y = −9 · down edge',     0, -ARENA.y+0.6, EDGE_FAINT, null, 0.7);
+    label('x = −16 · left edge',   -ARENA.x+0.35, 0.7, EDGE_FAINT, 'left', 0.7);
+    label('x = 16 · right edge',    ARENA.x-0.35, 0.7, EDGE_FAINT, 'right', 0.7);
+    /* and the axis names, at the far end of each */
+    label('x →', ARENA.x+0.4, -ARENA.y-0.7, DIM, 'left');
+    label('y ↑', -ARENA.x-0.35, ARENA.y+0.75, DIM, 'right');
   }
 
   /* ==================================================== the two */
@@ -499,9 +567,12 @@ window.DODGE = (function(){
   function camera(){
     const aspect=innerWidth/Math.max(1,innerHeight);
     if(!cam) cam=new THREE.OrthographicCamera(-1,1,1,-1,0.1,400);
-    const h=Math.max(ARENA.y+1.5, (ARENA.x+1.5)/aspect), w=h*aspect;
+    /* room round the arena for the numbers: y values on the left, x values
+       underneath. Nudged left and down so the arena sits in the middle of
+       what is left over. */
+    const h=Math.max(ARENA.y+2.2, (ARENA.x+3.6)/aspect), w=h*aspect;
     cam.left=-w; cam.right=w; cam.top=h; cam.bottom=-h;
-    cam.position.set(0,120,0); cam.up.set(0,0,-1); cam.lookAt(0,0,0);
+    cam.position.set(-0.8,120,0.4); cam.up.set(0,0,-1); cam.lookAt(-0.8,0,0.4);
     cam.updateProjectionMatrix();
     G.camera=cam;
   }

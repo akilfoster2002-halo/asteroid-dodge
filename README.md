@@ -31,6 +31,11 @@ to use the edge blocks. That is how a student finds out a rule is missing.
 The item ticks when all four badges are lit. Without a fence, the Avatar crosses the edge
 in a few frames, so a badge can't be earned by accident.
 
+**The coordinates are on the map.** A faint grid runs every 2 units, with the x = 0 and
+y = 0 axes a little brighter. The x values are along the bottom and the y values down the
+left. Each edge is labelled at its midpoint with its value and its block name
+(`x = 16 · right edge`), so students can see which numbers the edges are at.
+
 ## Handing it in: ⤓ PDF
 
 The **⤓ PDF** button asks for the student's name. It then downloads

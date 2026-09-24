@@ -142,7 +142,9 @@ html,body{margin:0;height:100%;overflow:hidden;background:#07060f}
           direction has its own edge: <code>up edge</code>, <code>down edge</code>,
           <code>left edge</code>, <code>right edge</code>. Right after moving up, if
           <code>&lt;touching [up edge]?&gt;</code>, move back down the same amount, and
-          do the same for the other three.</li>
+          do the same for the other three. The grid shows where the edges are:
+          <b>x = −16</b> and <b>x = 16</b> on the left and right, <b>y = 9</b> and
+          <b>y = −9</b> at the top and bottom.</li>
       <li><b>Game over.</b> <code>if &lt;touching [Asteroid]?&gt; then</code> …
           <code>stop [all]</code>. Without it, rocks pass straight through you and the game
           never ends.</li>
