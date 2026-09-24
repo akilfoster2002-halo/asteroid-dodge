@@ -65,7 +65,7 @@ game uses:
 | `vm.js` | runs the blocks: threads, clones, `touching`, `stop all` |
 | `coder.js` | the drag-and-drop block editor |
 | `strings.js`, `app.css`, `fonts/`, `lib/three.classic.js` | text, styles, typefaces, renderer |
-| **`dodge.js`** | the room: arena, Avatar and Asteroids, the Asteroids' scripts, checklist, clock, PDF export |
+| **`dodge.js`** | the room: arena, Avatar and Asteroids, the Asteroids' scripts, clock, script download |
 | **`boot.js`** | renderer, keyboard and frame loop (the same shim as Pong's standalone page) |
 
 The Asteroids are ordinary block scripts that anyone can click and read. A hidden spawner
