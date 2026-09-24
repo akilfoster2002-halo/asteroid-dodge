@@ -285,7 +285,7 @@ window.BLOCKS = (function(){
 
     'motion.move':"Slides forward in whatever direction the object is facing. Turn first to change where that is.",
     'motion.turn':"Spins the object around one axis. z turns it left and right, x tips it forward and back, y rolls it over sideways. Negative numbers go the other way.",
-    'motion.face':"Points the front of the object in a direction, in degrees. 90 is to the right, 0 is away from you, -90 is to the left. Use 'turn' if you want to spin it by an amount instead.",
+    'motion.face':"Points the front of the object in a direction, in degrees. 0 is up, 90 is to the right, 180 is down, -90 is to the left. Use 'turn' if you want to spin it by an amount instead.",
     'motion.goto':"Jumps straight to an exact spot. x is across, y is into the screen and back out, z is up.",
     'motion.glide':"Slides smoothly to a spot over the time you give it, instead of jumping there.",
     'motion.changeBy':"Nudges one coordinate by an amount. 'change x by 1' slides it along, 'change z by 1' lifts it.",
@@ -304,7 +304,7 @@ window.BLOCKS = (function(){
     'looks.shape':"Changes the object's costume — a shape, or anybody out of the kits. Mid-program, so a car can become a person.",
 
     'sense.dist':"Reports how far away something is. Compare it with a number to react when it gets close.",
-    'sense.touch':"True while the object is touching that thing. Pick 'up edge', 'down edge', 'left edge' or 'right edge' for one wall of the room — that is how you keep something from wandering out.",
+    'sense.touch':"True while the object is touching that thing. Pick 'edge' for the walls of the room (or 'up edge', 'down edge', 'left edge', 'right edge' for just one) — that is how you keep something from wandering out.",
     'sense.key':"True while that key is held down. Use it inside 'forever' for smooth controls.",
     'sense.posOf':"Reports one coordinate of another object — how you make one thing follow another.",
     'sense.timer':"Counts seconds since the project started or the timer was reset.",

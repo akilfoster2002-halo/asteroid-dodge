@@ -147,7 +147,11 @@ window.VM = (function(){
        nowhere else. Without that, `turn y by 15` and `change y by 1`
        would disagree about which way y points, in the same room, in front
        of somebody being taught the axes. */
-    a.mesh.rotation.set(a.tilt*Math.PI/180, a.dir*Math.PI/180, -(a.roll||0)*Math.PI/180);
+    /* DIRECTION IS SCRATCH'S in this copy of the framework: 0 points up
+       the screen, 90 right, 180 down, −90 left — clockwise, seen from the
+       flat stage camera. Three.js turns anticlockwise about +y from up
+       there, hence the minus. `move` and `point towards` agree with it. */
+    a.mesh.rotation.set(a.tilt*Math.PI/180, -a.dir*Math.PI/180, -(a.roll||0)*Math.PI/180);
     a.mesh.visible=!!a.visible;
   }
   /* A read-only copy of somebody else's object, for this room to look at. It
@@ -464,7 +468,7 @@ window.VM = (function(){
       /* --- motion -------------------------------------------------- */
       case 'motion.move': {
         if(a){ const d=num(g('n')), r=a.dir*Math.PI/180;
-               a.x += Math.sin(r)*d*0.1; a.z += Math.cos(r)*d*0.1; sync(a); }
+               a.x += Math.sin(r)*d*0.1; a.z -= Math.cos(r)*d*0.1; sync(a); }   // 0 = up the screen
         break;
       }
       /* WHICH ANGLE AN AXIS TURNS. The axis letters are the language's,
@@ -495,7 +499,7 @@ window.VM = (function(){
       case 'motion.setTo': { if(a){ place(a, g('a'), num(g('n'))); sync(a);} break; }
       case 'motion.point': {
         const o=target(g('o'),ctx);
-        if(a&&o){ a.dir = Math.atan2(o.x-a.x, o.z-a.z)*180/Math.PI; sync(a); }
+        if(a&&o){ a.dir = Math.atan2(o.x-a.x, a.z-o.z)*180/Math.PI; sync(a); }
         break;
       }
       case 'motion.glide': {

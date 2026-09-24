@@ -533,7 +533,7 @@ window.CODER = (function(){
       return `<select class="cin" data-set="${k}">
         <option ${v==='player'?'selected':''}>player</option>
         <option ${v==='myself'?'selected':''}>myself</option>
-        ${sp.edge?EDGE_OPTS.filter(o=>o!=='edge' || v==='edge').map(o=>
+        ${sp.edge?EDGE_OPTS.map(o=>
           `<option ${o===v?'selected':''}>${o}</option>`).join(''):''}
         ${VM.project.actors.filter(x=>!x.isClone).map(x=>
           `<option ${x.name===v?'selected':''}>${esc(x.name)}</option>`).join('')}</select>`;
@@ -549,8 +549,7 @@ window.CODER = (function(){
                    value="${esc(show)}" size="${Math.max(2,show.length)}">`;
   }
   const isSlot=(bk,k)=>slotTarget && slotTarget.owner===bk && slotTarget.key===k;
-  /* The four walls, one at a time. Plain `edge` (any wall) is only kept
-     on a block that already says it, so an old program still reads back. */
+  /* `edge` is any wall; the other four are one wall each */
   const EDGE_OPTS=['edge','up edge','down edge','left edge','right edge'];
   const allVarNames=()=>[...Object.keys(VM.project.vars), ...Object.keys((current()||{}).vars||{})];
 

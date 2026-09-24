@@ -12,7 +12,9 @@
      1. up, down, left and right on the keys — which means an `if` for
         each key, and all four inside a `forever`, or it checks once and
         never again;
-     2. `if touching Asteroid? then stop all` — the rule that makes it a
+     2. the Avatar is a ROCKET, and it has to point the way it is flying:
+        `point in direction 0` going up, 90 right, 180 down, −90 left;
+     3. `if touching Asteroid? then stop all` — the rule that makes it a
         game. Leave it out and the rocks sail straight through you and
         the clock never stops, which is the loudest way to find out.
 
@@ -55,6 +57,7 @@ window.DODGE = (function(){
       'ctrl.wait','ctrl.repeat','ctrl.forever','ctrl.if','ctrl.ifelse',
       'ctrl.waitUntil','ctrl.repeatUntil','ctrl.stop','ctrl.clone','ctrl.delclone',
       'motion.changeBy','motion.setTo','motion.goto','motion.pos','motion.turn',
+      'motion.face','motion.dir','motion.move',
       'looks.say','looks.sayFor','looks.show','looks.hide','looks.size','looks.colour',
       'sense.key','sense.touch','sense.posOf','sense.timer','sense.resetTimer',
       'op.add','op.sub','op.mul','op.div','op.lt','op.gt','op.eq',
@@ -70,6 +73,8 @@ window.DODGE = (function(){
     'motion.changeBy': { a:'y', n:STEP },
     'motion.setTo':    { a:'y', n:0 },
     'motion.goto':     { x:START.x, y:START.y, z:1 },
+    'motion.face':     { n:0 },
+    'motion.move':     { n:3 },
     'sense.key':       { k:'up' },
     'event.key':       { k:'up' },
     'sense.touch':     { o:ROCK },
@@ -138,12 +143,12 @@ window.DODGE = (function(){
   /* ================================================ the given scripts */
   const B=(op,args,body)=>{ const b={ op, args:args||{} }; if(body) b.body=body; return b; };
   const IF=(cond,body)=>B('ctrl.if',{ c:cond }, body);
-  /* one arrow key, fenced: move, and if that put you on THAT side's edge,
-     move straight back. Up is fenced by the up edge, left by the left edge
-     and so on round — the `touching [..] edge?` half is part 2 of the test. */
+  /* one arrow key: turn the rocket to face that way, then fly that way.
+     The `point in direction` half is part 2 of the test. */
+  const HEADING={ up:0, right:90, down:180, left:-90 };
   const key=(k,a,n)=>IF(B('sense.key',{ k }), [
-    B('motion.changeBy',{ a, n }),
-    IF(B('sense.touch',{ o:k+' edge' }), [ B('motion.changeBy',{ a, n:-n }) ])
+    B('motion.face',{ n:HEADING[k] }),
+    B('motion.changeBy',{ a, n })
   ]);
 
   /* THE ASTEROIDS, finished. Harder the longer you last: every rock adds
@@ -227,7 +232,7 @@ window.DODGE = (function(){
     a.scripts=starter();
     keep();
     if(window.CODER) CODER.render();
-    check.up=check.down=check.left=check.right=check.edge=check.hit=false;
+    check.up=check.down=check.left=check.right=check.point=check.hit=false;
     SIDES.forEach(d=>{ side[d]=false; });
     paintChecks();
   }
@@ -241,37 +246,26 @@ window.DODGE = (function(){
     return VM.project.actors.some(o=>o.name===ROCK && o.visible!==false &&
       Math.hypot(o.x-me.x, o.z-me.z) < (me.size+o.size)*0.6);
   };
-  const check={ up:false, down:false, left:false, right:false, edge:false, hit:false };
+  const check={ up:false, down:false, left:false, right:false, point:false, hit:false };
 
-  /* THE EDGE, measured the way `touching edge?` measures it. vm.js puts
-     the walls at ±(w/2 − 0.5) and a thing touches once its skin reaches
-     one, so w = 2·16 + 1 puts them exactly on the drawn border. */
+  /* `touching edge?` is not part of the test any more, but it still has
+     to mean the border that is drawn: vm.js puts the walls at ±(w/2 − 0.5),
+     so w = 2·16 + 1 lands them exactly on it. */
   window.LEVELS = Object.assign(window.LEVELS||{}, {
     dodge:{ w:ARENA.x*2+1, d:ARENA.y*2+1 } });
-  /* FOUR WALLS, FOUR BLOCKS. Each side is judged on its own: the program
-     has to contain `touching [up edge]?` for the top to count, and so on.
-     A fence built out of `y position > 9` is a fence, but it is not this
-     question. */
+
+  /* POINTING THE WAY IT FLIES, judged one direction at a time. Whenever
+     the rocket moves straight up, down, left or right under a key, the
+     room compares where it went with where it is pointing — Scratch's
+     compass, 0 up and clockwise. A direction's badge lights after a sixth
+     of a second of flying that way pointed the right way; all four = the
+     tick. Diagonals are not judged: two keys at once has no one answer. */
   const SIDES=['up','down','left','right'];
-  const usesEdge = d=>{
-    const walk=v=>{
-      if(!v || typeof v!=='object') return false;
-      if(Array.isArray(v)) return v.some(walk);
-      if(v.op==='sense.touch' && v.args && v.args.o===d+' edge') return true;
-      return Object.keys(v).some(k=>walk(v[k]));
-    };
-    const me=actor(ME); return !!(me && walk(me.scripts));
-  };
-  /* outside means the Avatar's middle is past the drawn line */
-  const outside = p => Math.abs(p.x)>ARENA.x || Math.abs(p.y)>ARENA.y;
-  /* against means pressed up against that one wall: within a step or so
-     of where `touching [..] edge?` starts saying yes */
-  const against = (p,me,d)=>{ const r=(me.size||1)*0.5+1;
-    return d==='up'   ? p.y>= ARENA.y-r : d==='down'  ? p.y<=-(ARENA.y-r)
-         : d==='left' ? p.x<=-(ARENA.x-r) : p.x>= ARENA.x-r; };
-  const side={ up:false, down:false, left:false, right:false };   // walls passed
-  let edgeTime={}, escaped=false;
-  let was=null, wasRunning=false, runStart=0, survived=0, lastRun=-1;
+  const WANT={ up:0, right:90, down:180, left:270 };
+  const norm = d => ((+d||0)%360+360)%360;
+  const off  = (a,b) => { const d=Math.abs(norm(a)-norm(b)); return Math.min(d, 360-d); };
+  const side={ up:false, down:false, left:false, right:false };   // directions passed
+  let rightWay={}, wrongWay=null;  let was=null, wasRunning=false, runStart=0, survived=0, lastRun=-1;
   let best=0; try{ best=parseFloat(localStorage.getItem(BEST_KEY))||0; }catch(e){}
   let over=null;          // how the last run ended: 'hit' | 'stopped' | null
 
@@ -283,7 +277,7 @@ window.DODGE = (function(){
 
     if(running && VM.runId!==lastRun){           // a fresh press of Run
       lastRun=VM.runId; runStart=performance.now(); over=null; hideOver();
-      edgeTime={}; escaped=false;
+      rightWay={};
       /* a `say` from the run that ended by `stop all` is still up — a
          restart does not clear bubbles, so the room says nothing for it */
       VM.project.actors.forEach(x=>{ if(x.saying) VM.runBlock({ op:'looks.say', args:{ s:'' } }, x); });
@@ -295,19 +289,20 @@ window.DODGE = (function(){
         if(dy> e) check.up=true;    if(dy<-e) check.down=true;
         if(dx<-e) check.left=true;  if(dx> e) check.right=true;
       }
-      /* STAYS INSIDE, one wall at a time: half a second pushed up against
-         that wall, with a key held, without once getting past any wall
-         this run — and with that wall's own `touching [..] edge?` in the
-         program doing the stopping. Without a fence the Avatar crosses
-         the edge zone in a few frames and is gone, so the half-second
-         cannot be earned by accident. All four walls = the tick. */
-      if(outside(now)) escaped=true;
-      if(!escaped && anyKey()) SIDES.forEach(d=>{
-        if(!against(now,me,d)) return;
-        edgeTime[d]=(edgeTime[d]||0)+dt;
-        if(edgeTime[d]>=0.5 && usesEdge(d)) side[d]=true;
-      });
-      check.edge = SIDES.every(d=>side[d]);
+      /* WHICH WAY IT FLEW this frame, if it was one of the four */
+      wrongWay=null;
+      if(was && anyKey()){
+        const dx=now.x-was.x, dy=now.y-was.y, e=1e-4;
+        const flew = (Math.abs(dy)<e && dx> e) ? 'right' : (Math.abs(dy)<e && dx<-e) ? 'left'
+                   : (Math.abs(dx)<e && dy> e) ? 'up'    : (Math.abs(dx)<e && dy<-e) ? 'down' : null;
+        if(flew){
+          if(off(me.dir, WANT[flew])<1){
+            rightWay[flew]=(rightWay[flew]||0)+dt;
+            if(rightWay[flew]>=1/6) side[flew]=true;
+          } else wrongWay={ flew, facing:norm(me.dir) };
+        }
+      }
+      check.point = SIDES.every(d=>side[d]);
     }
     if(wasRunning && !running){                  // the program just stopped
       over = hitting() ? 'hit' : 'stopped';
@@ -318,16 +313,23 @@ window.DODGE = (function(){
       showOver();
     }
     wasRunning=running;
+    const moved = running && !!was && (now.x!==was.x || now.y!==was.y);
     was=now;
 
     /* A HIT THE PROGRAM IGNORED is shown, not scored: the Avatar flashes
        red while a rock is inside it. It is the evidence that step 2 is
        missing, and it is all the room says about it. */
     const red = running && hitting();
-    if(me.mesh && me.mesh.material && me.mesh.material.color)
-      me.mesh.material.color.set(red ? '#ff5a5a' : me.colour);
+    const body=rocket(me);
+    if(body) body.color.set(red ? '#ff5a5a' : '#e9eef7');
     const warn=$('#dgWarn'); if(warn) warn.classList.toggle('hidden', !red);
-    const out=$('#dgOut'); if(out) out.classList.toggle('hidden', !(running && outside(now)));
+    const out=$('#dgOut');
+    if(out){
+      out.classList.toggle('hidden', !(running && wrongWay));
+      if(wrongWay) out.innerHTML=`🚀 ${T('Flying')} <b>${wrongWay.flew}</b> ${T('but pointing')} <b>${
+        Math.round(wrongWay.facing)}°</b> — ${T('use')} <b>point in direction</b>`;
+    }
+    flame(me, moved);
   }
 
   /* ============================================= the script, as a PDF
@@ -449,13 +451,52 @@ window.DODGE = (function(){
     setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
   }
 
+  /* ============================================================ the rocket
+     THE AVATAR IS DRAWN AS A ROCKET so which way it points can be seen at
+     a glance. The VM still builds its own cone for the Avatar — that is
+     the object, its size and its click box — and the rocket is hung
+     underneath it with the cone switched off. Built pointing UP the
+     screen (−z), so `direction 0` is nose-up and the VM's rotation does
+     the rest. Rebuilt whenever the VM rebuilds the mesh (a size change).
+     Returns the hull's material, for the red hit flash. */
+  function rocket(me){
+    const m=me && me.mesh; if(!m) return null;
+    if(m.userData.rocket) return m.userData.rocket.hull;
+    if(m.material) m.material.visible=false;
+    const g=new THREE.Group(), s=me.size||1;
+    const mat=c=>new THREE.MeshLambertMaterial({ color:c });
+    const hull=mat('#e9eef7'), trim=mat('#ff6b6b'), glass=mat('#7ee8ff');
+    const along=(geo, material, z)=>{            // a round part, laid along the rocket
+      const p=new THREE.Mesh(geo, material); p.rotation.x=-Math.PI/2; p.position.z=z; g.add(p); return p; };
+    along(new THREE.CylinderGeometry(0.28,0.3,0.9,16), hull, 0.05);         // body
+    along(new THREE.ConeGeometry(0.28,0.5,16), trim, -0.65);                // nose, pointing up the screen
+    const win=new THREE.Mesh(new THREE.SphereGeometry(0.13,12,8), glass);
+    win.position.set(0,0.2,-0.12); g.add(win);                              // porthole
+    [-1,1].forEach(sx=>{                                                    // two fins at the tail
+      const f=new THREE.Mesh(new THREE.BoxGeometry(0.28,0.08,0.34), trim);
+      f.position.set(sx*0.36,0,0.4); f.rotation.y=sx*0.35; g.add(f); });
+    const fire=new THREE.Mesh(new THREE.ConeGeometry(0.2,0.55,12),
+      new THREE.MeshBasicMaterial({ color:'#ffb347', transparent:true, opacity:0.9 }));
+    fire.rotation.x=Math.PI/2; fire.position.z=0.8; fire.visible=false; g.add(fire);
+    g.scale.setScalar(s*1.15);
+    m.add(g);
+    m.userData.rocket={ hull, fire };
+    return hull;
+  }
+  /* the exhaust shows while it is moving, and flickers */
+  function flame(me, on){
+    const r=me && me.mesh && me.mesh.userData.rocket; if(!r) return;
+    r.fire.visible=on;
+    if(on){ const k=0.8+Math.random()*0.5; r.fire.scale.set(1,k,1); }
+  }
+
   /* ==================================================== the screen */
   const ITEMS=[
     ['up',    'Avatar moves UP when you press a key'],
     ['down',  'Avatar moves DOWN when you press a key'],
     ['left',  'Avatar moves LEFT when you press a key'],
     ['right', 'Avatar moves RIGHT when you press a key'],
-    ['edge',  'Avatar can\'t leave the arena — touching up / down / left / right edge?'],
+    ['point', 'Rocket always points the way it is flying'],
     ['hit',   'Game ENDS (stop all) when an Asteroid hits you']
   ];
   function paintChecks(){
@@ -463,7 +504,7 @@ window.DODGE = (function(){
     const done=ITEMS.filter(i=>check[i[0]]).length;
     el.innerHTML=`<div class="dg-h">${T('YOUR TEST')} <b>${done}/${ITEMS.length}</b></div>`+
       ITEMS.map(([k,s])=>`<div class="dg-c ${check[k]?'ok':''}"><i>${check[k]?'✓':''}</i><span>${T(s)}${
-        k==='edge' ? `<span class="dg-sides">${SIDES.map(d=>
+        k==='point' ? `<span class="dg-sides">${SIDES.map(d=>
           `<em class="${side[d]?'ok':''}">${({up:'↑ up',down:'↓ down',left:'← left',right:'→ right'})[d]}</em>`).join('')}</span>` : ''
       }</span></div>`).join('');
   }

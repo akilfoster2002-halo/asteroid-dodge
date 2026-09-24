@@ -1,35 +1,33 @@
 # Asteroid Dodge — a block-coding test
 
-Asteroids fly across space from the right. The student's **Avatar** starts
-with no code. To pass, they write it in blocks:
+Asteroids fly across space from the right. The student's **Avatar** is a rocket, and it
+starts with no code. To pass, they write it in blocks:
 
 1. **Movement.** Up, down, left and right on the keys: an `if <key [..] pressed?>`
    and a `change y by` / `change x by` for each direction, all inside a `forever`
    (or the keys are only checked once).
-2. **Stay inside.** The Avatar must not leave the arena on any side. Each direction
-   has its own block: `<touching [up edge]?>`, `[down edge]`, `[left edge]` and
-   `[right edge]`. Right after moving up, if the Avatar is touching the up edge, move it
-   back down by the same amount. Do the same for the other three.
+2. **Point the way you fly.** The rocket must always point in the direction it is flying,
+   using `point in direction ( )`: **0** is up, **90** is right, **180** is down and
+   **−90** is left. The brief shows these numbers. For example, under `key [up]`:
+   `point in direction (0)`, then `change y by 0.3`.
 3. **Game over.** `if <touching [Asteroid]?> then stop [all]`. Without it the rocks pass
    straight through the Avatar and the game never ends.
 
 Then they press **▶ RUN** and try to survive. The time they last is their score.
 
-A checklist in the corner ticks off each part (up, down, left, right, stays inside,
-game over on hit).
+A checklist in the corner ticks off each part (up, down, left, right, points the way it
+flies, game over on hit).
 It only ticks when it sees **the student's program** do the thing. The room never moves
 the Avatar or ends the game by itself. When a rock overlaps the Avatar and the program
-keeps running, the Avatar flashes red. When it gets past the border, a warning tells them
-to use the edge blocks. That is how a student finds out a rule is missing.
+keeps running, the rocket flashes red. When it flies one way while pointing another, a
+warning says so, e.g. *Flying right but pointing 0°*. That is how a student finds out a
+rule is missing.
 
-**Stays inside** is judged one wall at a time, and the checklist shows a badge for each
-(↑ up, ↓ down, ← left, → right). A wall's badge lights when all three of these hold:
-- the program contains that wall's own block, e.g. `touching [left edge]?`
-- the Avatar has spent half a second pressed against that wall with a key held
-- it never got past any wall during that run
-
-The item ticks when all four badges are lit. Without a fence, the Avatar crosses the edge
-in a few frames, so a badge can't be earned by accident.
+**Points the way it flies** is judged one direction at a time, and the checklist shows a
+badge for each (↑ up, ↓ down, ← left, → right). Whenever a key moves the rocket straight
+up, down, left or right, the room compares that with the way it is pointing. A badge
+lights after a sixth of a second of flying that way pointed the right way. The item ticks
+when all four are lit. Diagonals (two keys at once) are not judged.
 
 ## Handing it in: ⤓ PDF
 
@@ -82,9 +80,16 @@ clones included, and skips hidden ones. This is how Scratch reads it. Before, it
 checked the first object with the name, which here is the hidden spawner, so
 `touching Asteroid?` could never be true.
 
-**Four edges instead of one.** In the framework, `touching [edge]?` meant "any wall".
-`vm.js` now also answers `up edge`, `down edge`, `left edge` and `right edge`, each named
-the way it looks from the top-down camera. The editor's dropdown offers those four.
-Plain `edge` still works, and it only appears in the dropdown on a block that already
-uses it. The room sets its walls (`LEVELS.dodge`) to line up exactly with the drawn border
-(x ±16, y ±9).
+**Direction is Scratch's.** In the original framework, `direction 0` pointed *down* the
+top-down screen and angles went anticlockwise. This copy of `vm.js` uses Scratch's compass
+instead, which is what students know: 0 up, 90 right, 180 down, −90 left, clockwise.
+`point in direction`, `move`, `turn` and `point towards` all agree with it.
+
+**The rocket** is drawn by `dodge.js`. The VM builds its usual shape for the Avatar, and the
+room hides it and hangs a rocket model underneath (hull, nose, porthole, fins and an exhaust
+flame while it moves). The VM's own rotation then turns the rocket, so it points exactly
+where `direction` says.
+
+`touching [edge]?` is no longer part of the test, but it still works. The dropdown also
+offers `up edge`, `down edge`, `left edge` and `right edge` for single walls, and the walls
+line up with the drawn border (x ±16, y ±9).
