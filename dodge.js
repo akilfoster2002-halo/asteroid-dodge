@@ -17,7 +17,8 @@
         the clock never stops, which is the loudest way to find out.
 
    WHAT THE ROOM OWNS is the boring half, the same division Pong draws: a
-   floor, a camera, a clock and a checklist. The room never moves the
+   floor, a camera and a clock. There is no checklist and no hints in
+   here on purpose — the walkthrough is the paper handout. The room never moves the
    Avatar, never ends the game and never decides a hit counts — it only
    WATCHES, and ticks a box when it sees the student's program do the
    thing. A student cannot get a tick for code they did not write.
@@ -206,12 +207,11 @@ window.DODGE = (function(){
   /* ================================================ the given scripts */
   const B=(op,args,body)=>{ const b={ op, args:args||{} }; if(body) b.body=body; return b; };
   const IF=(cond,body)=>B('ctrl.if',{ c:cond }, body);
-  /* one arrow key, fenced: move, and if that put you on THAT side's edge,
-     move straight back. Up is fenced by the up edge, left by the left edge
-     and so on round — the `touching [..] edge?` half is part 2 of the test. */
-  const key=(k,a,n)=>IF(B('sense.key',{ k }), [
-    B('motion.changeBy',{ a, n }),
-    IF(B('sense.touch',{ o:k+' edge' }), [ B('motion.changeBy',{ a, n:-n }) ])
+  /* one arrow key, guarded: only move if there is still room that way.
+     `if x position < 16` then `if key right pressed?` then `change x`,
+     which is the version the handout teaches. */
+  const key=(k,a,n,cmp,lim)=>IF(B(cmp,{ a:B('motion.pos',{ a }), b:lim }), [
+    IF(B('sense.key',{ k }), [ B('motion.changeBy',{ a, n }) ])
   ]);
 
   /* THE ASTEROIDS, finished. Harder the longer you last: every rock adds
@@ -254,10 +254,10 @@ window.DODGE = (function(){
     return [{ hat:B('event.flag'), body:[
       B('motion.goto',{ x:START.x, y:START.y, z:1 }),
       B('ctrl.forever',{},[
-        key('up',    'y',  STEP),
-        key('down',  'y', -STEP),
-        key('left',  'x', -STEP),
-        key('right', 'x',  STEP),
+        key('right', 'x',  STEP, 'op.lt',  ARENA.x),
+        key('left',  'x', -STEP, 'op.gt', -ARENA.x),
+        key('up',    'y',  STEP, 'op.lt',  ARENA.y),
+        key('down',  'y', -STEP, 'op.gt', -ARENA.y),
         IF(B('sense.touch',{ o:ROCK }), [
           B('looks.say',{ s:'Game over!' }),
           B('ctrl.stop',{ w:'all' })
@@ -295,9 +295,6 @@ window.DODGE = (function(){
     a.scripts=starter();
     keep();
     if(window.CODER) CODER.render();
-    check.up=check.down=check.left=check.right=check.edge=check.hit=false;
-    SIDES.forEach(d=>{ side[d]=false; });
-    paintChecks();
   }
 
   /* ==================================================== watching
@@ -309,41 +306,15 @@ window.DODGE = (function(){
     return VM.project.actors.some(o=>o.name===ROCK && o.visible!==false &&
       Math.hypot(o.x-me.x, o.z-me.z) < (me.size+o.size)*0.6);
   };
-  const check={ up:false, down:false, left:false, right:false, edge:false, hit:false };
-
   /* THE EDGE, measured the way `touching edge?` measures it. vm.js puts
      the walls at ±(w/2 − 0.5) and a thing touches once its skin reaches
      one, so w = 2·16 + 1 puts them exactly on the drawn border. */
   window.LEVELS = Object.assign(window.LEVELS||{}, {
     dodge:{ w:ARENA.x*2+1, d:ARENA.y*2+1 } });
-  /* FOUR WALLS, FOUR BLOCKS. Each side is judged on its own: the program
-     has to contain `touching [up edge]?` for the top to count, and so on.
-     A fence built out of `y position > 9` is a fence, but it is not this
-     question. */
-  const SIDES=['up','down','left','right'];
-  const usesEdge = d=>{
-    const walk=v=>{
-      if(!v || typeof v!=='object') return false;
-      if(Array.isArray(v)) return v.some(walk);
-      if(v.op==='sense.touch' && v.args && v.args.o===d+' edge') return true;
-      return Object.keys(v).some(k=>walk(v[k]));
-    };
-    const me=actor(ME); return !!(me && walk(me.scripts));
-  };
-  /* outside means the Avatar's middle is past the drawn line */
-  const outside = p => Math.abs(p.x)>ARENA.x || Math.abs(p.y)>ARENA.y;
-  /* against means pressed up against that one wall: within a step or so
-     of where `touching [..] edge?` starts saying yes */
-  const against = (p,me,d)=>{ const r=(me.size||1)*0.5+1;
-    return d==='up'   ? p.y>= ARENA.y-r : d==='down'  ? p.y<=-(ARENA.y-r)
-         : d==='left' ? p.x<=-(ARENA.x-r) : p.x>= ARENA.x-r; };
-  const side={ up:false, down:false, left:false, right:false };   // walls passed
-  let edgeTime={}, escaped=false;
   let was=null, wasRunning=false, runStart=0, survived=0, lastRun=-1;
   let best=0; try{ best=parseFloat(localStorage.getItem(BEST_KEY))||0; }catch(e){}
   let over=null;          // how the last run ended: 'hit' | 'stopped' | null
 
-  function anyKey(){ return Object.keys(G.keys).some(k=>G.keys[k]); }
   function watch(dt){
     const me=actor(ME); if(!me) return;
     const now={ x:rd(me,'x'), y:rd(me,'y') };
@@ -351,36 +322,16 @@ window.DODGE = (function(){
 
     if(running && VM.runId!==lastRun){           // a fresh press of Run
       lastRun=VM.runId; runStart=performance.now(); over=null; hideOver();
-      edgeTime={}; escaped=false;
       /* a `say` from the run that ended by `stop all` is still up — a
          restart does not clear bubbles, so the room says nothing for it */
       VM.project.actors.forEach(x=>{ if(x.saying) VM.runBlock({ op:'looks.say', args:{ s:'' } }, x); });
     }
     if(running){
       survived=(performance.now()-runStart)/1000;
-      if(was && anyKey()){
-        const dx=now.x-was.x, dy=now.y-was.y, e=1e-4;
-        if(dy> e) check.up=true;    if(dy<-e) check.down=true;
-        if(dx<-e) check.left=true;  if(dx> e) check.right=true;
-      }
-      /* STAYS INSIDE, one wall at a time: half a second pushed up against
-         that wall, with a key held, without once getting past any wall
-         this run — and with that wall's own `touching [..] edge?` in the
-         program doing the stopping. Without a fence the Avatar crosses
-         the edge zone in a few frames and is gone, so the half-second
-         cannot be earned by accident. All four walls = the tick. */
-      if(outside(now)) escaped=true;
-      if(!escaped && anyKey()) SIDES.forEach(d=>{
-        if(!against(now,me,d)) return;
-        edgeTime[d]=(edgeTime[d]||0)+dt;
-        if(edgeTime[d]>=0.5 && usesEdge(d)) side[d]=true;
-      });
-      check.edge = SIDES.every(d=>side[d]);
     }
     if(wasRunning && !running){                  // the program just stopped
       over = hitting() ? 'hit' : 'stopped';
       if(over==='hit'){
-        check.hit=true;
         if(survived>best){ best=survived; try{ localStorage.setItem(BEST_KEY, String(best)); }catch(e){} }
       }
       showOver();
@@ -388,20 +339,19 @@ window.DODGE = (function(){
     wasRunning=running;
     was=now;
 
-    /* A HIT THE PROGRAM IGNORED is shown, not scored: the Avatar flashes
-       red while a rock is inside it. It is the evidence that step 2 is
-       missing, and it is all the room says about it. */
+    /* A HIT THE PROGRAM IGNORED is shown, not explained: the Avatar
+       flashes red while a rock is inside it. No hint, no checklist — the
+       walkthrough is on the paper handout, not in the game. */
     const red = running && hitting();
     if(me.mesh && me.mesh.material && me.mesh.material.color)
       me.mesh.material.color.set(red ? '#ff5a5a' : me.colour);
-    const warn=$('#dgWarn'); if(warn) warn.classList.toggle('hidden', !red);
-    const out=$('#dgOut'); if(out) out.classList.toggle('hidden', !(running && outside(now)));
   }
 
   /* ============================================= the script, as a PDF
      WHAT A STUDENT HANDS IN: their Avatar's blocks written out as text,
      one block to a line and indented the way they nest, under their name,
-     the date, their best time and the checklist as it stands.
+     the date and their best time. Available at any point — a half-finished
+     program can be handed in as it stands.
 
      THE PDF IS WRITTEN HERE, by hand. The whole folder runs with no
      network and no install, and a PDF library off a CDN would break that
@@ -493,16 +443,12 @@ window.DODGE = (function(){
     if(typed===null) return;                   // cancelled
     name=typed.trim();
     try{ localStorage.setItem(NAME_KEY, name); }catch(e){}
-    const done=ITEMS.filter(i=>check[i[0]]).length;
     const rows=[
       { t:'ASTEROID DODGE - Block Coding Test', b:true },
       { t:'' },
       { t:'Student:     '+(name||'(no name)') },
       { t:'Date:        '+new Date().toLocaleString() },
       { t:'Best time:   '+best.toFixed(1)+' s' },
-      { t:'' },
-      { t:'CHECKLIST  '+done+'/'+ITEMS.length, b:true },
-      ...ITEMS.map(([k,txt])=>({ t:(check[k]?'[x] ':'[ ] ')+txt })),
       { t:'' },
       { t:'AVATAR SCRIPT', b:true },
       { t:'' },
@@ -518,23 +464,6 @@ window.DODGE = (function(){
   }
 
   /* ==================================================== the screen */
-  const ITEMS=[
-    ['up',    'Avatar moves UP when you press a key'],
-    ['down',  'Avatar moves DOWN when you press a key'],
-    ['left',  'Avatar moves LEFT when you press a key'],
-    ['right', 'Avatar moves RIGHT when you press a key'],
-    ['edge',  'Avatar can\'t leave the arena — touching up / down / left / right edge?'],
-    ['hit',   'Game ENDS (stop all) when an Asteroid hits you']
-  ];
-  function paintChecks(){
-    const el=$('#dgChecks'); if(!el) return;
-    const done=ITEMS.filter(i=>check[i[0]]).length;
-    el.innerHTML=`<div class="dg-h">${T('YOUR TEST')} <b>${done}/${ITEMS.length}</b></div>`+
-      ITEMS.map(([k,s])=>`<div class="dg-c ${check[k]?'ok':''}"><i>${check[k]?'✓':''}</i><span>${T(s)}${
-        k==='edge' ? `<span class="dg-sides">${SIDES.map(d=>
-          `<em class="${side[d]?'ok':''}">${({up:'↑ up',down:'↓ down',left:'← left',right:'→ right'})[d]}</em>`).join('')}</span>` : ''
-      }</span></div>`).join('');
-  }
   function clock(){
     const el=$('#dgClock'); if(!el) return;
     el.innerHTML=`<span>${T('SURVIVED')} <b>${survived.toFixed(1)}s</b></span>`+
@@ -620,7 +549,7 @@ window.DODGE = (function(){
     };
     $('#dgHelp').onclick=()=>$('#dgBrief').classList.remove('hidden');
     if(teacher) $('#dgTeacher').classList.remove('hidden');
-    paintChecks(); clock(); runBtn();
+    clock(); runBtn();
   }
 
   let keepT=0;
@@ -634,11 +563,11 @@ window.DODGE = (function(){
     if(starfield) starfield.position.x = ((starfield.position.x - dt*0.6 + 35) % 70) - 35;
     if(window.CODER) CODER.tick(dt);
     const hud=$('#dodge'); if(hud) hud.classList.toggle('coding', !!(window.CODER && CODER.open));
-    paintChecks(); clock(); runBtn();
+    clock(); runBtn();
     if((keepT+=dt)>1){ keepT=0; keep(); }
   }
 
-  return { start, tick, ME, ROCK, ARENA, answer, starter, check, scriptText, pdf, download,
+  return { start, tick, ME, ROCK, ARENA, answer, starter, scriptText, pdf, download,
            get active(){ return on; },
            get survived(){ return survived; },
            get over(){ return over; } };

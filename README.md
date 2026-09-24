@@ -1,52 +1,36 @@
 # Asteroid Dodge — a block-coding test
 
-Asteroids fly across space from the right. The student's **Avatar** starts
-with no code. To pass, they write it in blocks:
+Asteroids fly across space from the right. The student's **Avatar** starts with no code.
+They write it in blocks so that the game:
 
-1. **Movement.** Up, down, left and right on the keys: an `if <key [..] pressed?>`
-   and a `change y by` / `change x by` for each direction, all inside a `forever`
-   (or the keys are only checked once).
-2. **Stay inside.** The Avatar must not leave the arena on any side. Each direction
-   has its own block: `<touching [up edge]?>`, `[down edge]`, `[left edge]` and
-   `[right edge]`. Right after moving up, if the Avatar is touching the up edge, move it
-   back down by the same amount. Do the same for the other three.
-3. **Game over.** `if <touching [Asteroid]?> then stop [all]`. Without it the rocks pass
-   straight through the Avatar and the game never ends.
+1. **Moves**: up, down, left and right with the arrow keys.
+2. **Stays on the screen**: the Avatar never goes past an edge (x = ±16, y = ±9). The
+   expected approach is to check the position before moving, e.g.
+   `if <(x position) < 16> then` → `if <key [right arrow] pressed?> then` → `change x by 0.3`.
+   `touching [up/down/left/right edge]?` also works.
+3. **Ends when hit**: `if <touching [Asteroid]?> then stop [all]`.
 
 Then they press **▶ RUN** and try to survive. The time they last is their score.
 
-A checklist in the corner ticks off each part (up, down, left, right, stays inside,
-game over on hit).
-It only ticks when it sees **the student's program** do the thing. The room never moves
-the Avatar or ends the game by itself. When a rock overlaps the Avatar and the program
-keeps running, the Avatar flashes red. When it gets past the border, a warning tells them
-to use the edge blocks. That is how a student finds out a rule is missing.
+**This is a test, so the game gives no walkthrough.** There's no checklist and no hint
+messages; the paper handout describes the tasks and gives a word bank. The only feedback in
+the game is the game itself: the Avatar flashes red when a rock overlaps it and the program
+keeps running.
 
-**Stays inside** is judged one wall at a time, and the checklist shows a badge for each
-(↑ up, ↓ down, ← left, → right). A wall's badge lights when all three of these hold:
-- the program contains that wall's own block, e.g. `touching [left edge]?`
-- the Avatar has spent half a second pressed against that wall with a key held
-- it never got past any wall during that run
+## Handing it in: ⤓ DOWNLOAD SCRIPT
 
-The item ticks when all four badges are lit. Without a fence, the Avatar crosses the edge
-in a few frames, so a badge can't be earned by accident.
-
-**The coordinates are on the map.** A faint grid runs every 2 units, with the x = 0 and
-y = 0 axes a little brighter. The x values are along the bottom and the y values down the
-left. Each edge is labelled at its midpoint with its value and its block name
-(`x = 16 · right edge`), so students can see which numbers the edges are at.
-
-## Handing it in: ⤓ PDF
-
-The **⤓ PDF** button asks for the student's name. It then downloads
-`asteroid-dodge-<name>.pdf`, which contains:
+Available at any time, including with the editor open and with an unfinished program. It
+asks for the student's name and downloads `asteroid-dodge-<name>.pdf`, which contains:
 - the name, date and best time
-- the checklist as it stands
 - the Avatar's script as text, one block per line, indented the way the blocks nest,
   with `end` closing each `if`, `forever` and `repeat`
 
-The PDF is written by `dodge.js` itself, with no library, so it works offline like the
-rest of the folder.
+Students upload that PDF to Google Classroom. The PDF is written by `dodge.js` itself, with
+no library, so it works offline like the rest of the folder.
+
+**The coordinates are on the map.** A faint grid runs every 2 units, with the x = 0 and
+y = 0 axes a little brighter. The x values are along the bottom and the y values down the
+left, and each edge is labelled at its midpoint (`x = 16 · right edge`).
 
 ## Play it online
 

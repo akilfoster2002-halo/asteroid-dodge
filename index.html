@@ -12,7 +12,7 @@
      in for game.js with a renderer, a keyboard and a frame loop.
      ===================================================================== -->
 <title>Asteroid Dodge — block coding test</title>
-<meta name="description" content="Code your Avatar to move up, down, left and right, and to end the game when an Asteroid hits it. Survive as long as you can.">
+<meta name="description" content="A block-coding test: code your Avatar to fly, stay on screen, and end the game when an Asteroid hits it.">
 <link rel="stylesheet" href="app.css">
 <style>
 @font-face{font-family:'Space Mono';src:url('fonts/spacemono-700.woff2') format('woff2');
@@ -46,36 +46,18 @@ html,body{margin:0;height:100%;overflow:hidden;background:#07060f}
   letter-spacing:1.6px;color:var(--muted)}
 #dgClock b{font-size:22px;color:var(--star);letter-spacing:1px;margin-left:6px}
 #dgClock .dg-best b{font-size:15px;color:var(--accent)}
-#dgChecks{position:absolute;right:14px;bottom:14px;width:300px;padding:12px 14px;
-  font-size:13px;color:var(--muted);display:grid;gap:6px}
-.dg-h{font-family:var(--font-disp);letter-spacing:1.6px;font-size:12px;color:var(--text);
-  display:flex;justify-content:space-between;margin-bottom:2px}
-.dg-h b{color:var(--star)}
-.dg-c{display:flex;gap:9px;align-items:flex-start;line-height:1.3}
-.dg-c i{flex:none;width:16px;height:16px;border:1.5px solid var(--line);border-radius:4px;
-  font-style:normal;font-size:12px;display:grid;place-content:center;color:#13402f}
-.dg-c.ok{color:var(--text)}
-.dg-sides{display:flex;gap:5px;margin-top:4px;flex-wrap:wrap}
-.dg-sides em{font-style:normal;font-size:11px;padding:1px 6px;border-radius:6px;
-  border:1px solid var(--line);color:var(--muted)}
-.dg-sides em.ok{background:var(--good);border-color:var(--good);color:#13402f}
-.dg-c.ok i{background:var(--good);border-color:var(--good)}
-#dgWarn{position:absolute;left:50%;top:70px;transform:translateX(-50%);padding:7px 14px;
-  background:rgba(90,20,30,.88);border:1px solid var(--bad);border-radius:10px;
-  color:#ffd6da;font-size:13px}
-#dgOut{position:absolute;left:50%;top:112px;transform:translateX(-50%);padding:7px 14px;
-  background:rgba(80,60,10,.9);border:1px solid var(--warn);border-radius:10px;
-  color:#fff0d6;font-size:13px}
-#dodge.coding #dgOut{top:170px}
 #dgOver{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);pointer-events:auto;
   display:grid;gap:10px;justify-items:center;text-align:center;padding:24px 34px;min-width:280px;
   background:rgba(16,12,30,.94);border:1px solid var(--star);border-radius:16px;color:var(--muted)}
 #dgOver b{font-family:var(--font-disp);font-size:24px;letter-spacing:3px;color:var(--text)}
 #dgOver em{font-style:normal;font-size:22px;color:var(--star);font-family:var(--font-disp)}
 #dgOver .dg-sub{font-size:12px;letter-spacing:1px}
-#dodge.coding #dgTop,#dodge.coding #dgChecks,#dodge.coding #dgTeacher{display:none}
+/* while the editor is open only the download button stays, so a script can be
+   handed in from wherever the student is — it sits below the editor's own bar */
+#dodge.coding #dgTop > :not(#dgPdf),#dodge.coding #dgTeacher{display:none}
+#dodge.coding #dgTop{top:auto;bottom:14px;left:274px}      /* just right of the block list (10 + 252 wide) */
+@media (max-width:1150px){ #dodge.coding #dgTop{left:232px} } /* the list narrows to 210 there */
 #dodge.coding #dgClock{top:72px}
-#dodge.coding #dgWarn{top:128px}
 #dgTeacher{position:absolute;left:14px;bottom:14px;padding:6px 12px;font-size:12px;
   color:var(--warn);border-color:var(--warn)}
 
@@ -100,12 +82,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#07060f}
 
 @media (max-width:1180px){
   #dgClock{top:62px}
-  #dgWarn{top:116px}
-  #dgOut{top:158px}
-}
-@media (max-width:760px){
-  #dgChecks{width:auto;left:14px;font-size:12px}
-}
+    }
 </style>
 </head>
 <body>
@@ -115,14 +92,11 @@ html,body{margin:0;height:100%;overflow:hidden;background:#07060f}
   <div id="dgTop">
     <button class="dg-btn" id="dgOpen">▦ BLOCKS <small>C</small></button>
     <button class="dg-btn" id="dgRun">▶ RUN</button>
-    <button class="dg-btn" id="dgPdf" title="Download your Avatar script as a PDF">⤓ PDF</button>
+    <button class="dg-btn" id="dgPdf" title="Download your script as a PDF to upload to Google Classroom">⤓ DOWNLOAD SCRIPT</button>
     <button class="dg-btn" id="dgHelp" title="Show the test again">?</button>
     <button class="dg-btn" id="dgReset" title="Throw away your Avatar code">↺</button>
   </div>
   <div id="dgClock" class="dg-panel"></div>
-  <div id="dgWarn" class="hidden">💥 An Asteroid is hitting you — but your program didn't stop.</div>
-  <div id="dgOut" class="hidden">🚧 Your Avatar left the arena — use <b>touching [up / down / left / right edge]?</b> to stop it.</div>
-  <div id="dgChecks" class="dg-panel"></div>
   <div id="dgOver" class="hidden"></div>
   <div id="dgTeacher" class="dg-panel hidden">Teacher view — answer key loaded (not saved)</div>
 </div>
@@ -131,28 +105,12 @@ html,body{margin:0;height:100%;overflow:hidden;background:#07060f}
   <div class="card">
     <h1>ASTEROID DODGE</h1>
     <p class="kick">BLOCK CODING TEST</p>
-    <p>Asteroids fly across space from the right. They are already coded — click one to read how.
-       Your <b>Avatar</b> (the blue one) has <b>no code yet</b>. Write it in blocks.</p>
-    <ol>
-      <li><b>Movement.</b> Make the Avatar move <b>up</b>, <b>down</b>, <b>left</b> and <b>right</b>
-          when you press keys. <i>Hint:</i> <code>if &lt;key [up] pressed?&gt; then</code> +
-          <code>change y by 0.3</code> — and think about what has to go around them so they
-          are checked more than once.</li>
-      <li><b>Stay inside.</b> The Avatar must not leave the arena, on any side. Each
-          direction has its own edge: <code>up edge</code>, <code>down edge</code>,
-          <code>left edge</code>, <code>right edge</code>. Right after moving up, if
-          <code>&lt;touching [up edge]?&gt;</code>, move back down the same amount, and
-          do the same for the other three. The grid shows where the edges are:
-          <b>x = −16</b> and <b>x = 16</b> on the left and right, <b>y = 9</b> and
-          <b>y = −9</b> at the top and bottom.</li>
-      <li><b>Game over.</b> <code>if &lt;touching [Asteroid]?&gt; then</code> …
-          <code>stop [all]</code>. Without it, rocks pass straight through you and the game
-          never ends.</li>
-      <li>Press <b>▶ RUN</b> and stay alive as long as you can. Your time is your score.</li>
-    </ol>
-    <p>The checklist in the corner ticks each part off when it sees <i>your program</i> do it.
-       Your code is saved in this browser; press <b>⤓ PDF</b> to download your script to hand in.
-       <code>x</code> is left/right, <code>y</code> is up/down.</p>
+    <p>Asteroids fly across space from the right. Your <b>Avatar</b> (the blue shape) has
+       <b>no code yet</b>. Use your handout and write its code in blocks, then press
+       <b>▶ RUN</b> and survive as long as you can.</p>
+    <p><code>x</code> is left and right, <code>y</code> is up and down. The grid shows the numbers.</p>
+    <p>Press <b>C</b> or <b>▦ BLOCKS</b> to open the editor. Your code is saved in this browser.
+       Press <b>⤓ DOWNLOAD SCRIPT</b> at any time to save your code as a PDF for Google Classroom.</p>
     <div class="row">
       <button class="btn good" id="dgGo">Start coding</button>
     </div>
