@@ -12,7 +12,7 @@
      in for game.js with a renderer, a keyboard and a frame loop.
      ===================================================================== -->
 <title>Asteroid Dodge — block coding test</title>
-<meta name="description" content="Code your rocket to fly up, down, left and right, point the way it flies, and end the game when an Asteroid hits it. Survive as long as you can.">
+<meta name="description" content="Code your Avatar to move up, down, left and right, and to end the game when an Asteroid hits it. Survive as long as you can.">
 <link rel="stylesheet" href="app.css">
 <style>
 @font-face{font-family:'Space Mono';src:url('fonts/spacemono-700.woff2') format('woff2');
@@ -121,7 +121,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#07060f}
   </div>
   <div id="dgClock" class="dg-panel"></div>
   <div id="dgWarn" class="hidden">💥 An Asteroid is hitting you — but your program didn't stop.</div>
-  <div id="dgOut" class="hidden"></div>
+  <div id="dgOut" class="hidden">🚧 Your Avatar left the arena — use <b>touching [up / down / left / right edge]?</b> to stop it.</div>
   <div id="dgChecks" class="dg-panel"></div>
   <div id="dgOver" class="hidden"></div>
   <div id="dgTeacher" class="dg-panel hidden">Teacher view — answer key loaded (not saved)</div>
@@ -132,16 +132,17 @@ html,body{margin:0;height:100%;overflow:hidden;background:#07060f}
     <h1>ASTEROID DODGE</h1>
     <p class="kick">BLOCK CODING TEST</p>
     <p>Asteroids fly across space from the right. They are already coded — click one to read how.
-       Your <b>Avatar</b> is the rocket, and it has <b>no code yet</b>. Write it in blocks.</p>
+       Your <b>Avatar</b> (the blue one) has <b>no code yet</b>. Write it in blocks.</p>
     <ol>
       <li><b>Movement.</b> Make the Avatar move <b>up</b>, <b>down</b>, <b>left</b> and <b>right</b>
           when you press keys. <i>Hint:</i> <code>if &lt;key [up] pressed?&gt; then</code> +
           <code>change y by 0.3</code> — and think about what has to go around them so they
           are checked more than once.</li>
-      <li><b>Point the way you fly.</b> The rocket must always point in the direction it
-          is flying. Flying up, its nose points up. Flying left, it points left. Use
-          <code>point in direction ( )</code>: <b>0</b> is up, <b>90</b> is right,
-          <b>180</b> is down, <b>-90</b> is left.</li>
+      <li><b>Stay inside.</b> The Avatar must not leave the arena, on any side. Each
+          direction has its own edge: <code>up edge</code>, <code>down edge</code>,
+          <code>left edge</code>, <code>right edge</code>. Right after moving up, if
+          <code>&lt;touching [up edge]?&gt;</code>, move back down the same amount, and
+          do the same for the other three.</li>
       <li><b>Game over.</b> <code>if &lt;touching [Asteroid]?&gt; then</code> …
           <code>stop [all]</code>. Without it, rocks pass straight through you and the game
           never ends.</li>
